@@ -1,33 +1,26 @@
 /*Question1
 2a)
-You have a material with n temperature levels. You know that there exists a critical temperature f where
-0 <= f <= n such that the material will react or change its properties at temperatures higher than f but
-remain unchanged at or below f.
-Rules:
- You can measure the material's properties at any temperature level once.
- If the material reacts or changes its properties, you can no longer use it for further measurements.
- If the material remains unchanged, you can reuse it for further measurements.
+You have a team of n employees, and each employee is assigned a performance rating given in the
+integer array ratings. You want to assign rewards to these employees based on the following rules:
+Every employee must receive at least one reward.
+Employees with a higher rating must receive more rewards than their adjacent colleagues.
 Goal:
-Determine the minimum number of measurements required to find the critical temperature.
+Determine the minimum number of rewards you need to distribute to the employees.
 Input:
- k: The number of identical samples of the material.
- n: The number of temperature levels.
+ratings: The array of employee performance ratings.
 Output:
- The minimum number of measurements required to find the critical temperature.
+The minimum number of rewards needed to distribute.
 Example 1:
-Input: k = 1, n = 2
-Output: 2
-Explanation:
-Check the material at temperature 1. If its property changes, we know that f = 0.
-Otherwise, raise temperature to 2 and check if property changes. If its property changes, we know that f =
-1.If its property changes at temperature, then we know f = 2.
-Hence, we need at minimum 2 moves to determine with certainty what the value of f is.
+Input: ratings = [1, 0, 2]
+Output: 5
+Explanation: You can allocate to the first, second and third employee with 2, 1, 2 rewards respectively.
 Example 2:
-Input: k = 2, n = 6
-Output: 3
-Example 3:
-Input: k = 3, n = 14
+Input: ratings = [1, 2, 2]
 Output: 4
+Explanation: You can allocate to the first, second and third employee with 1, 2, 1 rewards respectively.
+The third employee gets 1 rewards because it satisfies the above two conditions.
+
+
 */
 import java.util.*;
 
