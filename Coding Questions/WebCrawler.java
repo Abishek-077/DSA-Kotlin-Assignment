@@ -108,7 +108,7 @@ public class WebCrawler {
         return content.toString();
     }
 
-    //  * Dummy method to extract URLs from the content.* In a production crawler, use an HTML parser (like Jsoup) to extract <a href="..."> links.
+    //  * Dummy method to extract URLs from the content.* In a production crawler, use an HTML parser (like jsonp) to extract <a href="..."> links.
 
     private List<String> extractUrls(String content) {
         List<String> urls = new ArrayList<>();
