@@ -47,7 +47,7 @@ public class PackageCollector_4b {
 
     public static int minRoads(int[] packages, int[][] roads) {
         int n = packages.length;
-        // No roads need to be traveled if there are no packa
+        // No roads need to be traveled if there are no parka
 
 
         boolean anyPackage = false;
