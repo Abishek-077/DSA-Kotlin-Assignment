@@ -1,142 +1,133 @@
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
 import java.net.URL;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.TimeUnit;
+import java.util.*;
+import java.util.concurrent.*;
+import java.util.regex.*;
 
 public class WebCrawler {
-    // Thread pool to manage worker threads.
-    private final ExecutorService executorService;
-    // BlockingQueue to hold URLs to be crawled.
-    private final BlockingQueue<String> urlQueue;
-    // Map to store crawled page content: URL -> Content.
-    private final ConcurrentHashMap<String, String> crawledData;
-    // Set to keep track of visited URLs.
-    private final Set<String> visitedUrls;
-    // Number of worker threads.
-    private final int numThreads;
 
-    public WebCrawler(int numThreads) {
-        this.numThreads = numThreads;
-        this.executorService = Executors.newFixedThreadPool(numThreads);
-        this.urlQueue = new LinkedBlockingQueue<>();
-        this.crawledData = new ConcurrentHashMap<>();
-        this.visitedUrls = ConcurrentHashMap.newKeySet();
-    }
-    //  Adds a URL to the crawling queue if it has not been visited yet.
-    public void addUrl(String url) {
-        if (visitedUrls.add(url)) { // Only add if URL is not already visited.
-            urlQueue.offer(url);
-        }
+    // Thread-safe data structures
+    private final BlockingQueue<String> linkQueue = new LinkedBlockingQueue<>();
+    private final Set<String> processedLinks = ConcurrentHashMap.newKeySet();
+    private final ConcurrentHashMap<String, String> scrapedData = new ConcurrentHashMap<>();
+
+    // Thread pool
+    private final ExecutorService threadPool;
+
+    // Constructor to initialize the thread pool
+    public WebCrawler(int threadsCount) {
+        this.threadPool = Executors.newFixedThreadPool(threadsCount);
     }
 
-    // * Starts the crawling process by launching worker threads.
+    // Method to begin the crawling process
+    public void beginCrawl(String startingUrl) {
+        // Add starting URL to the queue and mark it as processed
+        linkQueue.add(startingUrl);
+        processedLinks.add(startingUrl);
 
-    public void startCrawling() {
-        // Submit worker tasks.
-        for (int i = 0; i < numThreads; i++) {
-            executorService.submit(new Worker());
+        // Assign tasks to the thread pool
+        for (int i = 0; i < 10; i++) {
+            threadPool.submit(new CrawlWorker());
         }
-        
-        // Shutdown the executor after work is done.
-        executorService.shutdown();
+
+        // Shutdown the thread pool once all tasks are finished
+        threadPool.shutdown();
         try {
-            // Wait for all threads to finish (adjust timeout as needed).
-            if (!executorService.awaitTermination(60, TimeUnit.MINUTES)) {
-                executorService.shutdownNow();
+            if (threadPool.awaitTermination(10, TimeUnit.SECONDS)) {
+                System.out.println("Crawling finished.");
+            } else {
+                System.err.println("Timeout reached before crawling was completed.");
             }
         } catch (InterruptedException e) {
-            System.err.println("Crawling interrupted: " + e.getMessage());
-            executorService.shutdownNow();
-            Thread.currentThread().interrupt();
+            System.err.println("Crawl process interrupted: " + e.getMessage());
         }
+
+        // Display the scraped data
+        System.out.println("Scraped Data:");
+        scrapedData.forEach((url, content) -> System.out.println(url + " -> " + content));
     }
 
-    //  * Worker class that continuously polls the URL queue,fetches web page content, processes it, and adds any new URLs.
-
-    private class Worker implements Runnable {
+    // Worker class to process each URL
+    private class CrawlWorker implements Runnable {
         @Override
         public void run() {
             while (true) {
-                String url = null;
+                String urlToProcess = linkQueue.poll();
+                if (urlToProcess == null) {
+                    break; // No more URLs to process
+                }
+
                 try {
-                    // Poll for a URL; if no URL is available within 10 seconds, assume work is done.
-                    url = urlQueue.poll(10, TimeUnit.SECONDS);
-                    if (url == null) {
-                        // No URL found within timeout period; worker exits.
-                        break;
+                    // Get page content from the URL
+                    String pageData = fetchContent(urlToProcess);
+                    scrapedData.put(urlToProcess, pageData);
+
+                    // Find new URLs on the page
+                    Set<String> discoveredUrls = findUrls(pageData, urlToProcess);
+                    for (String newUrl : discoveredUrls) {
+                        synchronized (processedLinks) {
+                            if (!processedLinks.contains(newUrl)) {
+                                processedLinks.add(newUrl);
+                                linkQueue.add(newUrl);
+                            }
+                        }
                     }
-                    // Fetch the web page content.
-                    String content = fetchContent(url);
-                    // Store the fetched content.
-                    crawledData.put(url, content);
-                    // Process the content (e.g., extract new URLs).
-                    List<String> newUrls = extractUrls(content);
-                    for (String newUrl : newUrls) {
-                        addUrl(newUrl);
-                    }
-                } catch (InterruptedException ie) {
-                    Thread.currentThread().interrupt();
-                    break;
-                } catch (Exception e) {
-                    System.err.println("Error processing URL " + url + ": " + e.getMessage());
+                } catch (IOException e) {
+                    System.err.println("Failed to access URL: " + urlToProcess + " - " + e.getMessage());
                 }
             }
         }
-    }
 
-    //  * Fetches the content of a web page from the given URL.(In a real application, consider using a robust HTTP client.)
+        // Method to fetch the content from a given URL
+        private String fetchContent(String url) throws IOException {
+            HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
+            connection.setRequestMethod("GET");
 
-    private String fetchContent(String urlString) throws IOException {
-        StringBuilder content = new StringBuilder();
-        URL urlObj = new URL(urlString);
-        try (BufferedReader in = new BufferedReader(new InputStreamReader(urlObj.openStream()))) {
-            String line;
-            while ((line = in.readLine()) != null) {
-                content.append(line).append("\n");
+            int responseCode = connection.getResponseCode();
+            if (responseCode != HttpURLConnection.HTTP_OK) {
+                throw new IOException("HTTP error: " + responseCode);
+            }
+
+            try (Scanner scanner = new Scanner(connection.getInputStream())) {
+                scanner.useDelimiter("\\Z");
+                return scanner.next();
             }
         }
-        return content.toString();
-    }
 
-    //  * Dummy method to extract URLs from the content.* In a production crawler, use an HTML parser (like jsonp) to extract <a href="..."> links.
+        // Method to find all URLs from the page content
+        private Set<String> findUrls(String content, String base) {
+            Set<String> links = new HashSet<>();
+            String pattern = "<a\\s+(?:[^>]*?\\s+)?href=\"([^\"]*)\"";
+            Pattern regex = Pattern.compile(pattern);
+            Matcher matcher = regex.matcher(content);
 
-    private List<String> extractUrls(String content) {
-        List<String> urls = new ArrayList<>();
-        // Dummy implementation: In real use, parse the content and add discovered URLs.
-        // For example, you might search for patterns like href="http://..."
-        return urls;
-    }
-        //  * Returns the map of crawled data.
-    public ConcurrentHashMap<String, String> getCrawledData() {
-        return crawledData;
-    }
-
-    public static void main(String[] args) {
-        // Create a web crawler with 10 threads.
-        WebCrawler crawler = new WebCrawler(10);
-        // Seed the crawler with initial URLs.
-        crawler.addUrl("https://schoolworkspro.com/modules/st5008cem-programming-for-developers");
-        // crawler.addUrl("https://rahulpajiyar.com.np/");
-        // Start the crawling process.
-        crawler.startCrawling();
-        // Output the number of crawled pages.
-        System.out.println("Crawled pages: " + crawler.getCrawledData().size());
-
-        // Print fetched contents for each URL.
-        for (Map.Entry<String, String> entry : crawler.getCrawledData().entrySet()) {
-            System.out.println("URL: " + entry.getKey());
-            System.out.println("Content:\n" + entry.getValue());
-            System.out.println("---------------------------------------------------");
+            while (matcher.find()) {
+                String link = matcher.group(1);
+                if (link.startsWith("http")) {
+                    links.add(link);
+                } else if (link.startsWith("/")) {
+                    // Resolve relative URLs
+                    try {
+                        URL resolvedUrl = new URL(new URL(base), link);
+                        links.add(resolvedUrl.toString());
+                    } catch (Exception e) {
+                        System.err.println("Error resolving URL: " + link);
+                    }
+                }
+            }
+            return links;
         }
+    }
+
+    // Main method to initialize and start crawling
+    public static void main(String[] args) {
+        // Initialize the crawler with 10 threads
+        WebCrawler crawler = new WebCrawler(10);
+
+        // Begin crawling starting from a seed URL
+        System.out.println("Starting the crawl process...");
+        crawler.beginCrawl("https://www.example.com");
+        System.out.println("Crawl process completed.");
     }
 }
