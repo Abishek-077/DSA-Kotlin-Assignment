@@ -16,55 +16,67 @@ Note: Output table is sorted in descending order by hashtag_count and hashtag re
  import java.util.*;
  import java.util.regex.*;
  
- public class TrendingTweets_Hashtags_4a {
-     public static void main(String[] args) {
-         Scanner scanner = new Scanner(System.in);
-         Map<String, Integer> hashtagCount = new HashMap<>();
-         Pattern pattern = Pattern.compile("#[A-Za-z0-9]+");
+ public class TrendingTweets_Hashtags_4a  {
  
-         System.out.println("Enter 7 tweets (each with user_id, tweet_id, tweet text, date):");
+     public static void main(String[] args) {
+         // Create a Scanner object for input and a map to store hashtag counts
+         Scanner inputScanner = new Scanner(System.in);
+         HashMap<String, Integer> hashtagFrequency = new HashMap<>();
+         
+         // Define a regex pattern to detect hashtags in the tweet text
+         Pattern hashtagRegex = Pattern.compile("#\\w+");
+ 
+         // Request input for 7 tweets from the user
+         System.out.println("Please enter details for 7 tweets (Each field will be entered separately):");
  
          for (int i = 1; i <= 7; i++) {
              System.out.println("\nTweet " + i + ":");
+             
+             // Capture details for each tweet
+             System.out.print("Enter User ID: ");
+             int userId = Integer.parseInt(inputScanner.nextLine().trim());
+             System.out.print("Enter Tweet ID: ");
+             int tweetId = Integer.parseInt(inputScanner.nextLine().trim());
+             System.out.print("Enter Tweet Text: ");
+             String tweetText = inputScanner.nextLine().trim();
+             System.out.print("Enter Tweet Date (YYYY-MM-DD): ");
+             String tweetDate = inputScanner.nextLine().trim();
  
-             System.out.print("Enter user_id: ");
-             int userId = Integer.parseInt(scanner.nextLine().trim());
- 
-             System.out.print("Enter tweet_id: ");
-             int tweetId = Integer.parseInt(scanner.nextLine().trim());
- 
-             System.out.print("Enter tweet text: ");
-             String tweet = scanner.nextLine().trim();
- 
-             System.out.print("Enter tweet_date (YYYY-MM-DD): ");
-             String tweetDate = scanner.nextLine().trim();
- 
-             if (!tweetDate.startsWith("2024-02")) {
-                 continue;
-             }
- 
-             Matcher matcher = pattern.matcher(tweet);
+             // Use regex to find and count hashtags in the tweet
+             Matcher matcher = hashtagRegex.matcher(tweetText);
              while (matcher.find()) {
-                 String hashtag = matcher.group();
-                 hashtagCount.put(hashtag, hashtagCount.getOrDefault(hashtag, 0) + 1);
+                 String hashtag = matcher.group().toLowerCase(); // Normalize to lowercase
+                 // Increment the hashtag count in the map
+                 hashtagFrequency.put(hashtag, hashtagFrequency.getOrDefault(hashtag, 0) + 1);
              }
          }
-         scanner.close();
  
-         List<Map.Entry<String, Integer>> sortedHashtags = new ArrayList<>(hashtagCount.entrySet());
-         sortedHashtags.sort((a, b) -> {
-             int countCompare = b.getValue().compareTo(a.getValue());
-             return countCompare != 0 ? countCompare : b.getKey().compareTo(a.getKey());
+         // Close the scanner to free resources
+         inputScanner.close();
+ 
+         // Sort hashtags first by frequency (descending) then alphabetically (descending)
+         List<Map.Entry<String, Integer>> sortedHashtags = new ArrayList<>(hashtagFrequency.entrySet());
+         sortedHashtags.sort((entry1, entry2) -> {
+             // Compare based on frequency in descending order
+             int frequencyComparison = entry2.getValue().compareTo(entry1.getValue());
+             if (frequencyComparison != 0) {
+                 return frequencyComparison;
+             }
+             // If frequencies are the same, compare by hashtag name in descending order
+             return entry2.getKey().compareTo(entry1.getKey());
          });
  
+         // Display the top 3 trending hashtags
          System.out.println("\n+------------+-------+");
          System.out.println("| Hashtag    | Count |");
          System.out.println("+------------+-------+");
-         int limit = Math.min(3, sortedHashtags.size());
-         for (int i = 0; i < limit; i++) {
-             Map.Entry<String, Integer> entry = sortedHashtags.get(i);
-             System.out.printf("| %-10s | %5d |\n", entry.getKey(), entry.getValue());
+ 
+         // Print the top 3 hashtags or fewer if there aren't enough
+         for (int i = 0; i < Math.min(3, sortedHashtags.size()); i++) {
+             System.out.printf("| %-10s | %5d |\n", sortedHashtags.get(i).getKey(), sortedHashtags.get(i).getValue());
          }
+ 
          System.out.println("+------------+-------+");
      }
  }
+ 
