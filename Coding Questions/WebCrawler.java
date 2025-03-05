@@ -127,7 +127,7 @@ public class WebCrawler {
 
         // Begin crawling starting from a seed URL
         System.out.println("Starting the crawl process...");
-        crawler.beginCrawl("https://www.example.com");
+        crawler.beginCrawl("https://www.wikipedia.org");
         System.out.println("Crawl process completed.");
     }
 }
